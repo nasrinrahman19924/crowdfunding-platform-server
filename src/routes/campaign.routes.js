@@ -10,6 +10,7 @@ const {
   supportCampaign,
   getMyDonations,
   getCampaignSupporters,
+  getAllCampaignsForAdmin,
 
   // Admin
   getPendingCampaigns,
@@ -22,6 +23,7 @@ const router = express.Router();
 // Create Campaign
 router.post("/", createCampaign);
 
+router.get("/admin/all", getAllCampaignsForAdmin);
 // Get approved campaigns for supporters
 router.get("/", getAllCampaigns);
 

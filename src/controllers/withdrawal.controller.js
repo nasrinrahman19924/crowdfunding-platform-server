@@ -285,26 +285,31 @@ const approveWithdrawal = async (req, res) => {
       });
     }
 
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid withdrawal ID",
+      });
+    }
+
     const db = getDB();
 
+    // Find pending withdrawal
     const withdrawal = await db.collection("withdrawals").findOne({
       _id: new ObjectId(id),
+      status: "pending",
     });
 
     if (!withdrawal) {
       return res.status(404).json({
         success: false,
-        message: "Withdrawal request not found",
+        message: "Pending withdrawal request not found",
       });
     }
 
-    if (withdrawal.status !== "pending") {
-      return res.status(400).json({
-        success: false,
-        message: "Only pending withdrawals can be approved",
-      });
-    }
+    const withdrawalCredit = Number(withdrawal.withdrawal_credit);
 
+    // Find creator
     const creator = await db.collection("users").findOne({
       email: withdrawal.creator_email,
       role: "creator",
@@ -317,9 +322,7 @@ const approveWithdrawal = async (req, res) => {
       });
     }
 
-    const withdrawalCredit = Number(withdrawal.withdrawal_credit);
-
-    // Calculate creator's total raised credits
+    // Get creator campaigns
     const campaigns = await db
       .collection("campaigns")
       .find({
@@ -327,12 +330,13 @@ const approveWithdrawal = async (req, res) => {
       })
       .toArray();
 
+    // Total amount raised
     const totalRaisedCredits = campaigns.reduce(
       (total, campaign) => total + Number(campaign.raisedAmount || 0),
       0,
     );
 
-    // Calculate previously approved/completed withdrawals
+    // Get already approved/completed withdrawals
     const previousWithdrawals = await db
       .collection("withdrawals")
       .find({
@@ -353,16 +357,18 @@ const approveWithdrawal = async (req, res) => {
 
     const availableCredits = totalRaisedCredits - totalWithdrawnCredits;
 
+    // Make sure creator still has enough available credits
     if (withdrawalCredit > availableCredits) {
       return res.status(400).json({
         success: false,
-        message: "Creator does not have enough available credits",
+        message:
+          "Creator does not have enough available credits for this withdrawal",
         availableCredits,
       });
     }
 
-    // Mark withdrawal as approved
-    const withdrawalResult = await db.collection("withdrawals").updateOne(
+    // Approve only if status is still pending
+    const result = await db.collection("withdrawals").updateOne(
       {
         _id: new ObjectId(id),
         status: "pending",
@@ -375,16 +381,27 @@ const approveWithdrawal = async (req, res) => {
       },
     );
 
-    if (withdrawalResult.modifiedCount === 0) {
-      return res.status(400).json({
+    // Prevent duplicate approval
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({
         success: false,
-        message: "Withdrawal approval failed",
+        message: "This withdrawal request has already been processed",
       });
     }
+
+    // Calculate remaining available credits
+    const remainingCredits = availableCredits - withdrawalCredit;
 
     return res.status(200).json({
       success: true,
       message: "Withdrawal approved successfully",
+      withdrawal: {
+        id: withdrawal._id,
+        status: "approved",
+        withdrawalCredit,
+        withdrawalAmount: withdrawal.withdrawal_amount,
+      },
+      remainingAvailableCredits: remainingCredits,
     });
   } catch (error) {
     console.error("Approve withdrawal error:", error);

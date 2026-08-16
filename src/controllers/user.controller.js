@@ -1,5 +1,5 @@
+const { ObjectId } = require("mongodb");
 const { getDB } = require("../db/connectDB");
-
 // Create user
 const createUser = async (req, res) => {
   try {
@@ -147,8 +147,174 @@ const getAdminDashboardSummary = async (req, res) => {
   }
 };
 
+// Get all users - Admin
+const getAllUsers = async (req, res) => {
+  try {
+    const db = getDB();
+
+    const users = await db
+      .collection("users")
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    return res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (error) {
+    console.error("Get all users error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load users",
+    });
+  }
+};
+
+// Update user role - Admin
+const updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const allowedRoles = ["admin", "creator", "supporter"];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user role",
+      });
+    }
+
+    const db = getDB();
+
+    const user = await db.collection("users").findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const result = await db.collection("users").updateOne(
+      {
+        _id: new ObjectId(id),
+      },
+      {
+        $set: {
+          role,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Role was not changed",
+      });
+    }
+
+    const updatedUser = await db.collection("users").findOne({
+      _id: new ObjectId(id),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User role updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update user role error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update user role",
+    });
+  }
+};
+
+// Delete user - Admin
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const db = getDB();
+
+    const user = await db.collection("users").findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const result = await db.collection("users").deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "User could not be deleted",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete user error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete user",
+    });
+  }
+};
+
 module.exports = {
   createUser,
   getUserProfile,
   getAdminDashboardSummary,
+  // Admin
+   getAllUsers, 
+   updateUserRole,
+    deleteUser,
 };

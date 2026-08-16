@@ -501,7 +501,6 @@ const getMyDonations = async (req, res) => {
   }
 };
 
-
 const updateCampaignStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -787,6 +786,22 @@ const rejectCampaign = async (req, res) => {
     });
   }
 };
+const getAllCampaignsForAdmin = async (req, res) => {
+  try {
+    const db = getDB();
+    const campaigns = await db
+      .collection("campaigns")
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+    return res.status(200).json({ success: true, campaigns });
+  } catch (error) {
+    console.error("Get all campaigns for admin error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load campaigns" });
+  }
+};
 
 module.exports = {
   createCampaign,
@@ -798,11 +813,11 @@ module.exports = {
   supportCampaign,
   getMyDonations,
   getCampaignSupporters,
-  
 
   // Admin
   getPendingCampaigns,
   updateCampaignStatus,
   approveCampaign,
   rejectCampaign,
+  getAllCampaignsForAdmin,
 };
