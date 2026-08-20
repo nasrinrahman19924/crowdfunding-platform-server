@@ -18,10 +18,15 @@ const {
   rejectCampaign,
 } = require("../controllers/campaign.controller");
 
+const {
+  requireAuth,
+  requireCreator,
+} = require("../middleware/auth.middleware");
+
 const router = express.Router();
 
 // Create Campaign
-router.post("/", createCampaign);
+router.post("/", requireAuth, requireCreator, createCampaign);
 
 router.get("/admin/all", getAllCampaignsForAdmin);
 // Get approved campaigns for supporters
@@ -55,7 +60,7 @@ router.get("/:id/supporters", getCampaignSupporters);
 router.get("/:id", getCampaignById);
 
 // Update campaign
-router.put("/:id", updateCampaign);
+router.put("/:id", requireAuth, requireCreator, updateCampaign);
 
 // Delete campaign
 router.delete("/:id", deleteCampaign);

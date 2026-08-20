@@ -10,8 +10,6 @@ const createCampaign = async (req, res) => {
       category,
       goalAmount,
       deadline,
-      creatorEmail,
-      creatorName,
     } = req.body;
 
     if (
@@ -19,9 +17,7 @@ const createCampaign = async (req, res) => {
       !description ||
       !category ||
       !goalAmount ||
-      !deadline ||
-      !creatorEmail ||
-      !creatorName
+      !deadline
     ) {
       return res.status(400).json({
         success: false,
@@ -31,6 +27,17 @@ const createCampaign = async (req, res) => {
 
     const db = getDB();
 
+    const user = await db.collection("users").findOne({
+      email: req.user.email,
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     const newCampaign = {
       title,
       description,
@@ -38,8 +45,11 @@ const createCampaign = async (req, res) => {
       category,
       goalAmount: Number(goalAmount),
       deadline: new Date(deadline),
-      creatorEmail,
-      creatorName,
+
+      // 🔐 Identity comes from authenticated user
+      creatorEmail: user.email,
+      creatorName: user.name,
+
       status: "pending",
       raisedAmount: 0,
       createdAt: new Date(),
@@ -264,6 +274,12 @@ const deleteCampaign = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Campaign not found",
+      });
+    }
+    if (existingCampaign.creatorEmail !== req.user.email) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to edit this campaign",
       });
     }
 
